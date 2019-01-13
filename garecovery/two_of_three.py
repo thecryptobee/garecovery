@@ -25,7 +25,8 @@ def get_scriptpubkey_hex(redeem_script_hash_hex):
 def get_redeem_script(keys):
     """Return a 2of3 multisig redeem script as a hex string"""
     keys = [wally.hex_from_bytes(key) for key in keys]
-    logging.debug("get_redeem_script public keys = {}".format(keys))
+    print('-------------------------------------------------------------------')
+    print("get_redeem_script public keys = {}".format(keys))
     return wally.hex_to_bytes("5221{}21{}21{}53ae".format(*keys))
 
 
@@ -35,7 +36,11 @@ def bip32_key_from_base58check(base58check):
 
 
 def derive_user_key(wallet, subaccount, branch=1):
+    print('-------------------------------------------------------------------')
+    print('@derive_user_key, subaccount:', subaccount)
     subaccount_path = gacommon.get_subaccount_path(subaccount)
+    print('-------------------------------------------------------------------')
+    print('@derive_user_key, path:', subaccount_path)
     return gacommon.derive_hd_key(wallet, subaccount_path + [branch])
 
 
@@ -80,12 +85,16 @@ def createDerivedKeySet(ga_xpub, wallets, custom_xprv, network):
     # The GreenAddress extended public key (ga_xpub) also contains the subaccount index encoded
     # as the child_num
     subaccount = wally.bip32_key_get_child_num(ga_xpub)
+    print('----------------------------------------------------------------------------')
+    print('subaccount derivation from ga_xpub:', subaccount)
 
     # Given the subaccount the user keys can be derived. Optionally the user may provide a custom
     # extended private key as the backup
     user_keys = [derive_user_key(wallet, subaccount) for wallet in wallets]
+    print('-------------------------------------------------------------------')
+    print("User xpubs: ", user_keys[0], str(user_keys[0]))
     if custom_xprv:
-        logging.debug("Using custom xprv")
+        print("Using custom xprv")
         root_xprv = bip32_key_from_base58check(custom_xprv)
         branch = 1
         xprv = gacommon.derive_hd_key(root_xprv, [branch], wally.BIP32_FLAG_KEY_PRIVATE)
@@ -97,7 +106,8 @@ def createDerivedKeySet(ga_xpub, wallets, custom_xprv, network):
         """
 
         def __init__(self, pointer):
-            logging.debug('Derive keys for subaccount={}, pointer={}'.format(subaccount, pointer))
+            print('-------------------------------------------------------------------')
+            print('Derive keys for subaccount={}, pointer={}'.format(subaccount, pointer))
 
             self.subaccount = subaccount
             self.pointer = pointer
@@ -105,22 +115,29 @@ def createDerivedKeySet(ga_xpub, wallets, custom_xprv, network):
             # Derive the GreenAddress public key for this pointer value
             ga_key = gacommon.derive_hd_key(ga_xpub, [pointer], wally.BIP32_FLAG_KEY_PUBLIC)
             self.ga_key = wally.bip32_key_get_pub_key(ga_key)
-            logging.debug("ga_key = {}".format(wally.hex_from_bytes(self.ga_key)))
+            print("ga_key = {}".format(wally.hex_from_bytes(self.ga_key)))
 
             # Derive the user private keys for this pointer value
             flags = wally.BIP32_FLAG_KEY_PRIVATE
             user_key_paths = [(key, [pointer]) for key in user_keys]
             private_keys = [gacommon.derive_hd_key(*path, flags=flags) for path in user_key_paths]
             self.private_keys = [wally.bip32_key_get_priv_key(k) for k in private_keys]
+            print('-------------------------------------------------------------------')
+            privateKeysHex = [wally.hex_from_bytes(key) for key in self.private_keys]
+            print('privateKeys:', privateKeysHex)
 
             # Derive the user public keys from the private keys
             user_public_keys = [wally.ec_public_key_from_private_key(k) for k in self.private_keys]
             public_keys = [self.ga_key] + user_public_keys
+            print('-------------------------------------------------------------------')
+            publicKeysHex = [wally.hex_from_bytes(key) for key in public_keys]
+            print('publicKeys:', publicKeysHex)
 
             # Script could be segwit or not - generate both segwit and non-segwit addresses
             self.witnesses = {cls.type_: cls(public_keys, network) for cls in (P2SH, P2WSH)}
-            logging.debug('p2sh address: {}'.format(self.witnesses['p2sh'].address))
-            logging.debug('p2wsh address: {}'.format(self.witnesses['p2wsh'].address))
+            print('-------------------------------------------------------------------')
+            print('p2sh address: {}'.format(self.witnesses['p2sh'].address))
+            print('p2wsh address: {}'.format(self.witnesses['p2wsh'].address))
 
     return DerivedKeySet
 
@@ -152,7 +169,7 @@ class UTXO:
 
     def get_feerate(self):
         """Return the required fee rate in satoshis per byte"""
-        logging.debug("Connecting to bitcoinrpc to get feerate")
+        print("Connecting to bitcoinrpc to get feerate")
         core = bitcoincore.Connection(clargs.args)
 
         blocks = clargs.args.fee_estimate_blocks
@@ -165,10 +182,10 @@ class UTXO:
             fee_satoshi_kb = fee_btc_kb * gaconstants.SATOSHI_PER_BTC
             fee_satoshi_byte = round(fee_satoshi_kb / 1000)
 
-            logging.debug('feerate = {} BTC/kb'.format(fee_btc_kb))
-            logging.debug('feerate = {} satoshis/kb'.format(fee_satoshi_kb))
+            print('feerate = {} BTC/kb'.format(fee_btc_kb))
+            print('feerate = {} satoshis/kb'.format(fee_satoshi_kb))
 
-        logging.info('Fee estimate for confirmation in {} blocks is '
+        print('Fee estimate for confirmation in {} blocks is '
                      '{} satoshis/byte'.format(blocks, fee_satoshi_byte))
 
         return fee_satoshi_byte
@@ -181,16 +198,16 @@ class UTXO:
         amount_satoshi = wally.tx_get_output_satoshi(self.tx, self.vout)
 
         if fee_satoshi >= amount_satoshi:
-            logging.warning('Insufficient funds to cover fee')
-            logging.warning('txout has value of {}, fee = {}'.format(amount_satoshi, fee_satoshi))
+            print('Insufficient funds to cover fee')
+            print('txout has value of {}, fee = {}'.format(amount_satoshi, fee_satoshi))
 
         # Calculate adjusted amount = input amount - fee
         adjusted_amount_satoshi = max(0, amount_satoshi - fee_satoshi)
-        logging.debug('tx amount = amount - fee = {} - {} = {}'.format(
+        print('tx amount = amount - fee = {} - {} = {}'.format(
             amount_satoshi, fee_satoshi, adjusted_amount_satoshi))
         assert adjusted_amount_satoshi >= 0
 
-        logging.debug("Create tx: {} sat -> {}".format(adjusted_amount_satoshi, self.dest_address))
+        print("Create tx: {} sat -> {}".format(adjusted_amount_satoshi, self.dest_address))
 
         # Set nlocktime to the current blockheight to discourage 'fee sniping', as per the core
         # wallet implementation
@@ -204,10 +221,10 @@ class UTXO:
     def get_fee(self, tx):
         """Given a raw transaction return the fee"""
         virtual_tx_size = wally.tx_get_vsize(tx)
-        logging.debug("virtual transaction size = {}".format(virtual_tx_size))
+        print("virtual transaction size = {}".format(virtual_tx_size))
         fee_satoshi_byte = self.get_feerate()
         fee_satoshi = fee_satoshi_byte * virtual_tx_size
-        logging.debug('Calculating fee over {} (virtual) byte tx @{} satoshi per '
+        print('Calculating fee over {} (virtual) byte tx @{} satoshi per '
                       'byte = {} satoshis'.format(virtual_tx_size, fee_satoshi_byte, fee_satoshi))
         return fee_satoshi
 
@@ -245,7 +262,7 @@ class TwoOfThree(object):
             self.wallets.append(backup_wallet)
         else:
             assert self.custom_xprv
-            logging.info('Using custom xprv = {}'.format(self.custom_xprv))
+            print('Using custom xprv = {}'.format(self.custom_xprv))
 
         inferred_network = self.infer_network()
         if inferred_network != clargs.args.network:
@@ -268,11 +285,11 @@ class TwoOfThree(object):
 
     def scan_blockchain(self, keysets):
         # Blockchain scanning is delegated to core via bitcoinrpc
-        logging.debug("Connecting to bitcoinrpc to scan blockchain")
+        print("Connecting to bitcoinrpc to scan blockchain")
         core = bitcoincore.Connection(clargs.args)
 
         if core.getnetworkinfo()["version"] == 170000 and clargs.args.ignore_mempool:
-            logging.warning('Mempool transactions are being ignored')
+            print('Mempool transactions are being ignored')
             # If the node is running version 0.17.0 and
             # the user does not want to scan the mempool, then use
             # scantxoutset, otherwise fall back to importmulti + listunspent
@@ -286,12 +303,12 @@ class TwoOfThree(object):
                     # the potential of output descriptors (we could delegate the HD
                     # derivation to core). However, as long as the RPC will be marked as
                     # experimental, it is better to keep its usage simple.
-            logging.info('Scanning UTXO set for {} derived addresses'.format(len(scanobjects)))
+            print('Scanning UTXO set for {} derived addresses'.format(len(scanobjects)))
             all_utxos = core.scantxoutset("start", scanobjects)["unspents"]
-            logging.debug('Unspents: {}'.format(all_utxos))
+            print('Unspents: {}'.format(all_utxos))
         elif not clargs.args.ignore_mempool:
-            logging.info("Scanning from '{}'".format(clargs.args.scan_from))
-            logging.warning('This step may take 10 minutes or more')
+            print("Scanning from '{}'".format(clargs.args.scan_from))
+            print('This step may take 10 minutes or more')
 
             # Need to import our keysets into core so that it will recognise the
             # utxos we are looking for
@@ -305,21 +322,21 @@ class TwoOfThree(object):
                         'timestamp': clargs.args.scan_from,
                         'watchonly': True,
                     })
-            logging.info('Importing {} derived addresses into bitcoind'.format(len(requests)))
+            print('Importing {} derived addresses into bitcoind'.format(len(requests)))
             result = core.importmulti(requests)
             expected_result = [{'success': True}] * len(requests)
             if result != expected_result:
-                logging.warning('Unexpected result from importmulti')
-                logging.warning('Expected: {}'.format(expected_result))
-                logging.warning('Actual: {}'.format(result))
+                print('Unexpected result from importmulti')
+                print('Expected: {}'.format(expected_result))
+                print('Actual: {}'.format(result))
                 raise exceptions.ImportMultiError('Unexpected result from importmulti')
-            logging.info('Successfully imported {} derived addresses'.format(len(result)))
+            print('Successfully imported {} derived addresses'.format(len(result)))
 
             # Scan the blockchain for any utxos with addresses that match the derived keysets
-            logging.info('Getting unspent transactions...')
+            print('Getting unspent transactions...')
             all_utxos = core.listunspent(0, 9999999, addresses)
-            logging.debug('all utxos = {}'.format(all_utxos))
-            logging.info('There are {} unspent transactions'.format(len(all_utxos)))
+            print('all utxos = {}'.format(all_utxos))
+            print('There are {} unspent transactions'.format(len(all_utxos)))
         else:
             # The flag --ingore-mempool is not intended to ignore the mempool, but just to
             # make the user aware that `scantxoutset` does not look at mempool transactions.
@@ -342,11 +359,11 @@ class TwoOfThree(object):
         dest_address = self.get_destination_address()
         for txid_match, raw_tx in zip(tx_matches, raw_txs):
             txid, keyset, witness, txvout = txid_match
-            logging.info('Found recoverable transaction, '
+            print('Found recoverable transaction, '
                          'subaccount={}, pointer={}, txid={}, witness type={}'.
                          format(keyset.subaccount, keyset.pointer, txid,
                                 witness.type_))
-            logging.debug("found raw={}".format(raw_tx))
+            print("found raw={}".format(raw_tx))
             utxo = UTXO(
                 keyset,
                 witness.type_,
@@ -370,7 +387,7 @@ class TwoOfThree(object):
         # 2) If ga_xpub is not given it's possible to iterate over the possible values of
         #    subaccount and build a larger search space. This is suboptimal
         if clargs.args.search_subaccounts:
-            logging.warn('No --ga-xpub specified, deriving and iterating over possible subaccounts')
+            print('No --ga-xpub specified, deriving and iterating over possible subaccounts')
             keyset_factories = []
             for subaccount in range(*subaccounts):
                 xpubs = ga_xpub.xpubs_from_mnemonic(self.mnemonic, subaccount, clargs.args.network)
@@ -386,7 +403,8 @@ class TwoOfThree(object):
 
     def get_utxos(self, subaccounts, pointers):
         keysets = self.get_keysets(subaccounts, pointers)
-        return self.scan_blockchain(keysets)
+        # return self.scan_blockchain(keysets)
+        return False
 
     def rescan(self, pointer_search_depth, num_subaccounts):
         pointers = (0, pointer_search_depth)
@@ -394,23 +412,23 @@ class TwoOfThree(object):
 
         utxos = []
         while True:
-            logging.info("Scanning subaccount {}->{}, pointers {}->{}".format(
+            print("Scanning subaccount {}->{}, pointers {}->{}".format(
                 subaccounts[0], subaccounts[1], pointers[0], pointers[1]))
 
             next_utxos = self.get_utxos(subaccounts, pointers)
             if not next_utxos:
-                logging.info('No transactions found, stopping scan')
+                print('No transactions found, stopping scan')
                 break
 
             # As long as some utxos have been found in the range (pointers), keep scanning
-            logging.info('Found {} transactions'.format(len(next_utxos)))
+            print('Found {} transactions'.format(len(next_utxos)))
             utxos.extend(next_utxos)
             pointers = (pointers[1], pointers[1] + pointer_search_depth)
 
         return utxos
 
     def sign_utxos(self):
-        logging.debug("signing {} utxos...".format(len(self.utxos)))
+        print("signing {} utxos...".format(len(self.utxos)))
         return [utxo.sign() for utxo in self.utxos]
 
     def get_transactions(self):

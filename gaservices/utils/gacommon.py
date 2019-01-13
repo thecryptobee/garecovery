@@ -108,17 +108,24 @@ def countersign(txdata, private_key):
 
 
 def derive_hd_key(root, path, flags=0):
+    print('-------------------------------------------------------------------')
+    print('Root:', root, 'Path:', path)
     return wally.bip32_key_from_parent_path(root, path, flags | wally.BIP32_FLAG_SKIP_HASH)
 
 
 def get_subaccount_path(subaccount):
     if subaccount == 0:
         return []
-    return [gaconstants.HARDENED | 3, gaconstants.HARDENED | subaccount]
+    subaccount_path = [gaconstants.HARDENED | 3, gaconstants.HARDENED | subaccount]
+    print('-------------------------------------------------------------------')
+    print('Derived subaccount_path:', subaccount_path)
+    return subaccount_path
 
 
 def derive_user_private_key(txdata, wallet, branch):
     subaccount = txdata['prevout_subaccounts'][0] or 0
     pointer = txdata['prevout_pointers'][0] or 0
     path = get_subaccount_path(subaccount)
+    print('-------------------------------------------------------------------')
+    print('@derive_user_private_key, path:', path)
     return derive_hd_key(wallet, path + [branch, pointer])
