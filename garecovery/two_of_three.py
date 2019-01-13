@@ -44,6 +44,11 @@ def derive_user_key(wallet, subaccount, branch=1):
     return gacommon.derive_hd_key(wallet, subaccount_path + [branch])
 
 
+# def derive_user_key_alloc(wallet, subaccount, branch=1):
+  
+#     subaccount_path = gacommon.get_subaccount_path(subaccount)
+#     return gacommon.derive_hd_key_alloc(wallet, subaccount_path + [branch])
+
 class P2SH:
 
     type_ = 'p2sh'
@@ -91,8 +96,12 @@ def createDerivedKeySet(ga_xpub, wallets, custom_xprv, network):
     # Given the subaccount the user keys can be derived. Optionally the user may provide a custom
     # extended private key as the backup
     user_keys = [derive_user_key(wallet, subaccount) for wallet in wallets]
+    # user_keys_allocated = [derive_user_key_alloc(wallet, subaccount) for wallet in wallets]
+    # print('-------------------------------------------------------------------------')
+    # print("Allocated user keys:", user_keys_allocated)
+    
     print('-------------------------------------------------------------------')
-    print("User xpubs: ", user_keys[0], str(user_keys[0]))
+    print("User xpriv: ", user_keys)
     if custom_xprv:
         print("Using custom xprv")
         root_xprv = bip32_key_from_base58check(custom_xprv)

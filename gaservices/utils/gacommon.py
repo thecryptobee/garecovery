@@ -112,6 +112,12 @@ def derive_hd_key(root, path, flags=0):
     print('Root:', root, 'Path:', path)
     return wally.bip32_key_from_parent_path(root, path, flags | wally.BIP32_FLAG_SKIP_HASH)
 
+# def derive_hd_key_alloc(root, path, flags=0):
+#     print('-------------------------------------------------------------------')
+#     print('Root:', root, 'Path:', path)
+#     print("Wally:", wally)
+#     return wally.bip32_key_from_parent_path_alloc(root, path, flags | wally.BIP32_FLAG_SKIP_HASH)
+
 
 def get_subaccount_path(subaccount):
     if subaccount == 0:
